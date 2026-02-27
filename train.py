@@ -71,4 +71,4 @@ def evaluate_model(model, test_loader, device, cycle, epoch=None):
     df_results = pd.DataFrame(results)
     #全体の正解率を計算
     accuracy = (df_results['True Label'] == df_results['Predicted']).mean()
-    return accuracy, df_results
+    return  df_results, accuracy
