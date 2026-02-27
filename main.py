@@ -47,7 +47,7 @@ def main():
         # サンプリング (最終サイクル以外)
         if cycle < NUM_CYCLES - 1:
             if sampling_strategy == 'entropy':
-                new_indices, _ = entropy_sampling(model, unlabeled_indices, train_dataset, QUERY_SIZE, device)
+                new_indices = entropy_sampling(model, unlabeled_indices, train_dataset, QUERY_SIZE, device)
             elif sampling_strategy == 'manual':
                 manual_counts = {0:10, 1:10, 2:10, 3:10, 4:10, 5:10, 6:10, 7:10, 8:10, 9:10}
                 new_indices = manual_class_sampling(unlabeled_indices, train_dataset, manual_counts)
