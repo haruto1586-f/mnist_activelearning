@@ -1,3 +1,4 @@
+import os
 import torch
 import numpy as np
 import pandas as pd
@@ -5,6 +6,21 @@ from dataset import get_mnist_datasets, get_dataloaders
 from model import get_resnet50_for_mnist
 from sampling import entropy_sampling, manual_class_sampling
 from train import train_model, evaluate_model
+
+def get_unique_filename(base_path):
+    """ファイルが存在する場合、末尾に _1, _2... を付けて重複を回避する"""
+    # ファイルが存在しなければ、そのままのファイル名を返す
+    if not os.path.exists(base_path):
+        return base_path
+    
+    name, ext = os.path.splitext(base_path)
+    i = 1
+    # 同じ名前のファイルが存在する限り、数字を増やし続ける
+    while os.path.exists(f"{name}_{i}{ext}"):
+        i += 1
+    
+    # 見つかった空き番号でファイル名を作成して返す
+    return f"{name}_{i}{ext}"
 
 def main():
     # デバイスの設定
@@ -90,16 +106,16 @@ def main():
             unlabeled_indices = [idx for idx in unlabeled_indices if idx not in new_indices]
         
         #予測結果の保存    
-        final_df = pd.concat(all_evaluation_results, ignore_index=True) #リストに入った全サイクルのDFを縦に結合
-        csv_filename = 'detailed_predicition_log.csv'
-        final_df.to_csv(csv_filename, index=False)
-        print(f"すべての予測データを'{csv_filename}'に保存しました。")
+        final_eval_df = pd.concat(all_evaluation_results, ignore_index=True) #リストに入った全サイクルのDFを縦に結合
+        eval_csv_name = get_unique_filename('detailed_predictions_log.csv')
+        final_eval_df.to_csv(eval_csv_name, index=False)
+        print(f"すべての予測データを'{eval_csv_name}'に保存しました。")
         
         #アノテーション結果の保存
-        final_annotated_df = pd.concat(all_annotated_records, ignore_index=True) #リストに入った全サイクルのDFを縦に結合
-        annotated_csv_name = 'annotated_data_log.csv'
-        final_annotated_df.to_csv(annotated_csv_name, index=False)
-        print(f"すべてのアノテーションデータを'{annotated_csv_name}'に保存しました。")
+        final_eval_annotated_df = pd.concat(all_annotated_records, ignore_index=True) #リストに入った全サイクルのDFを縦に結合
+        eval_annotated_csv_name = get_unique_filename('annotated_data_log.csv')
+        final_eval_annotated_df.to_csv(eval_annotated_csv_name, index=False)
+        print(f"すべてのアノテーションデータを'{eval_annotated_csv_name}'に保存しました。")
         
 
 if __name__ == "__main__":
