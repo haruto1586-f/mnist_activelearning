@@ -33,6 +33,7 @@ def evaluate_model(model, test_loader, device, cycle, epoch=None):
     model.eval()
     
     results = []
+    global_idx = 0 #テストデータ全体のインデックスを管理
     
     with torch.no_grad():
         for inputs, labels in test_loader:
@@ -57,6 +58,7 @@ def evaluate_model(model, test_loader, device, cycle, epoch=None):
                 row_data ={
                     'Cycle': cycle,
                     'Epoch': epoch if epoch is not None else 'Final',
+                    'Test_Image_Index': global_idx + i,
                     'True Label': labels_np[i],
                     'Predicted' : preds_np[i],
                     'Loss': losses_np[i]
@@ -66,6 +68,7 @@ def evaluate_model(model, test_loader, device, cycle, epoch=None):
                     row_data[f'Confidence_Class_{cls_idx}'] = probs_np[i][cls_idx]
                     
                 results.append(row_data)
+                global_idx += 1
                 
     #pandasのdataframeに変換
     df_results = pd.DataFrame(results)
