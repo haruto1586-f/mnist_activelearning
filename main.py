@@ -49,10 +49,10 @@ def main():
             cycle_annotated_data.append({
                 'Cycle': cycle + 1,
                 'Train_Image_Index': idx,
-                'True Label': label
-                'Sampling Reason': info['Reason'],
-                'Entropy_Score': info['Entropy'],
-                'Confidence_Score': info['Confidence']
+                'True Label': label,
+                'Sampling Reason': annotation_info[idx]['Reason'],
+                'Entropy_Score': annotation_info[idx]['Entropy'],
+                'Confidence_Score': annotation_info[idx]['Confidence']
             })
         df_annotated = pd.DataFrame(cycle_annotated_data)
         all_annotated_records.append(df_annotated) 
