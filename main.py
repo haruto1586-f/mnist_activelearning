@@ -60,6 +60,7 @@ def main():
             for idx in labeled_indices:
                 label = train_dataset.targets[idx].item()
                 cycle_annotated_data.append({
+                    'Mode': mode_str,
                     'Cycle': cycle + 1,
                     'Train_Image_Index': idx,
                     'True Label': label,
@@ -81,6 +82,7 @@ def main():
             
             #モデルの評価
             df_results, acc = evaluate_model(model, test_loader, device, cycle=cycle + 1)
+            df_results.insert(0, 'Mode', mode_str) #追加
             print(f"Accuracy: {acc:.4f}")
             
             all_evaluation_results.append(df_results) # 各サイクルの評価結果を保存

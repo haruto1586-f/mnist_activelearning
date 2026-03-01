@@ -17,9 +17,9 @@ def get_unique_filename(base_path):
 
 def save_model(model,cycle, acc, mode_str):
     """モデルの重みとメタデータの保存"""
-    weight_filename = f"model_weights_{mode_str}_cycle{cycle+1}.pt"
+    weight_filename = f"model_weights_{mode_str}_cycle{cycle}.pt"
     save_data = {
-        'cycle': cycle + 1,
+        'cycle': cycle,
         'best_score': acc,
         'model_state_dict': model.state_dict()
     }
