@@ -6,21 +6,7 @@ from dataset import get_mnist_datasets, get_dataloaders
 from model import get_resnet50_for_mnist
 from sampling import entropy_sampling, manual_class_sampling
 from train import train_model, evaluate_model
-
-def get_unique_filename(base_path):
-    """ファイルが存在する場合、末尾に _1, _2... を付けて重複を回避する"""
-    # ファイルが存在しなければ、そのままのファイル名を返す
-    if not os.path.exists(base_path):
-        return base_path
-    
-    name, ext = os.path.splitext(base_path)
-    i = 1
-    # 同じ名前のファイルが存在する限り、数字を増やし続ける
-    while os.path.exists(f"{name}_{i}{ext}"):
-        i += 1
-    
-    # 見つかった空き番号でファイル名を作成して返す
-    return f"{name}_{i}{ext}"
+from logger import save_model, save_logs
 
 def main():
     # デバイスの設定
@@ -99,24 +85,22 @@ def main():
             
             all_evaluation_results.append(df_results) # 各サイクルの評価結果を保存
             
-            #モデルの重みとメタデータの保存
-            weight_filename = f"model_weights_{mode_str}_cycle{cycle+1}.pt"
-            save_data = {
-                'cycle': cycle + 1,
-                'best_score': acc,
-                'model_state_dict': model.state_dict()
-            }
-            torch.save(save_data, weight_filename)
-            print(f"モデルを'{weight_filename}'に保存しました．")
+            #loggerファイルでモデルの保存
+            save_model(model, cycle +1, acc, mode_str)
             
-            # サンプリング (最終サイクル以外)
-            if cycle < NUM_CYCLES - 1:
+            if cycle < NUM_CYCLES -1:
                 if sampling_strategy == 'entropy':
-                    new_indices, new_entropies, new_confidences = entropy_sampling(model, unlabeled_indices, train_dataset, QUERY_SIZE, device)
+                    new_indices, new_entropies, new_confidences = entropy_sampling(
+                        model,
+                        unlabeled_indices,
+                        train_dataset,
+                        QUERY_SIZE,
+                        device
+                    )
                 elif sampling_strategy == 'manual':
-                    manual_counts = {0:10, 1:10, 2:10, 3:10, 4:10, 5:10, 6:10, 7:10, 8:10, 9:10}
+                    manual_counts = {0: 10, 1: 10, 2: 10, 3: 10, 4: 10, 5: 10, 6: 10, 7: 10, 8: 10, 9: 10} # 各クラスから均等にサンプリング
                     new_indices, new_entropies, new_confidences = manual_class_sampling(unlabeled_indices, train_dataset, manual_counts)
-                
+
                 for i, idx in enumerate(new_indices):
                     annotation_info[idx] = {
                         'Reason': sampling_strategy,
@@ -125,19 +109,8 @@ def main():
                     }
                 labeled_indices.extend(new_indices)
                 unlabeled_indices = [idx for idx in unlabeled_indices if idx not in new_indices]
-            
-        #予測結果の保存    
-        final_eval_df = pd.concat(all_evaluation_results, ignore_index=True) #リストに入った全サイクルのDFを縦に結合
-        eval_csv_name = get_unique_filename('detailed_predictions_log_{mode_str}.csv')
-        final_eval_df.to_csv(eval_csv_name, index=False)
-        print(f"すべての予測データを'{eval_csv_name}'に保存しました。")
-        
-        #アノテーション結果の保存
-        final_eval_annotated_df = pd.concat(all_annotated_records, ignore_index=True) #リストに入った全サイクルのDFを縦に結合
-        eval_annotated_csv_name = get_unique_filename(f'annotated_data_log_{mode_str}.csv')
-        final_eval_annotated_df.to_csv(eval_annotated_csv_name, index=False)
-        print(f"すべてのアノテーションデータを'{eval_annotated_csv_name}'に保存しました。")
-            
+                
+        save_logs(all_evaluation_results, all_annotated_records, mode_str)
 
 if __name__ == "__main__":
     main()
