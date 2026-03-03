@@ -123,7 +123,7 @@ def main():
     print("グラフを描画中...")
     plt.figure(figsize=(12, 8))
     plt.contourf(xx, yy, Z, alpha=0.3, cmap='tab10',levels=np.arange(-0.5,10.5,1), vmin=0, vmax=9)  #決定境界を背景色として淡く塗る
-    scatter = plt.scatter(features_2d[:, 0], features_2d[:, 1], c=labels, edgecolor='k', s=25, cmap='tab10', vmin=0, vmax=9, alpha=0.3)  #特徴点をクラスごとに色分けしてプロット
+    scatter = plt.scatter(features_2d[:, 0], features_2d[:, 1], c=labels, edgecolor='k', s=25, cmap='tab10', vmin=0, vmax=9)  #特徴点をクラスごとに色分けしてプロット
     
     #アノテーションされたデータを赤色の星マークで表示
     if annotated_features_2d is not None:
