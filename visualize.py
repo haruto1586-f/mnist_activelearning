@@ -1,3 +1,4 @@
+import os
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Subset
@@ -35,11 +36,11 @@ def main():
     
     #モデルの準備と重みのロード
     model = get_resnet50_for_mnist(device)
-    weight_path = "model_weights_reset_cycle5.pt" #ロードする重みを指定
+    weight_path = "model_weights_continue_cycle5.pt" #ロードする重みを指定
     
     try:
         #保存したデータから重み本体だけを取り出して復元
-        checkpoint = torch.load(weight_path, map_location=device)
+        torch.serialization.add_safe_globals([np._core.multiarray.scalar])  # NumPyの内部モジュールを安全に追加
         checkpoint = torch.load(weight_path, map_location=device, weights_only=False)
         model.load_state_dict(checkpoint['model_state_dict'])
         print(f"モデル'{weight_path}'をロードしました．(Cycle {checkpoint.get('cycle', '?')})")
@@ -49,7 +50,6 @@ def main():
     
     #データの準備
     transform = transforms.Compose([
-        transforms.Greyscale(num_output_channels=3),  # ResNetは3チャンネル入力を想定しているため、グレースケールをRGBに変換
         transforms.ToTensor(),
         transforms.Normalize((0.5,), (0.5,))
     ])
@@ -88,8 +88,8 @@ def main():
     #グラフの描画
     print("グラフを描画中...")
     plt.figure(figsize=(12, 8))
-    plt.contourf(xx, yy, Z, alpha=0.3, cmap='tab10')  #決定境界を背景色として淡く塗る
-    scatter = plt.scatter(features_2d[:, 0], features_2d[:, 1], c=labels, edgecolor='k', s=25, cmap='tab10')
+    plt.contourf(xx, yy, Z, alpha=0.3, cmap='tab10',levels=np.arange(-0.5,10.5,1), vmin=0, vmax=9)  #決定境界を背景色として淡く塗る
+    scatter = plt.scatter(features_2d[:, 0], features_2d[:, 1], c=labels, edgecolor='k', s=25, cmap='tab10', vmin=0, vmax=9)  #特徴点をクラスごとに色分けしてプロット
     
     cbar = plt.colorbar(scatter, ticks=range(10))
     cbar.set_label('Digit Class (0-9)', fontsize=14)
@@ -100,7 +100,8 @@ def main():
     plt.tight_layout()
     
     # 画像として保存
-    save_name = 'umap_decision_boundary.png'
+    base_weight_name = os.path.splitext(os.path.basename(weight_path))[0]
+    save_name = f'decision_boundary_{base_weight_name}.png'
     plt.savefig(save_name)
     print(f"グラフを '{save_name}' に保存しました")
     
