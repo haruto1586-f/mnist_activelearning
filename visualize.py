@@ -40,6 +40,7 @@ def main():
     try:
         #保存したデータから重み本体だけを取り出して復元
         checkpoint = torch.load(weight_path, map_location=device)
+        checkpoint = torch.load(weight_path, map_location=device, weights_only=False)
         model.load_state_dict(checkpoint['model_state_dict'])
         print(f"モデル'{weight_path}'をロードしました．(Cycle {checkpoint.get('cycle', '?')})")
     except FileNotFoundError:
