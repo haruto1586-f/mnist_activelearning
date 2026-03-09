@@ -19,31 +19,36 @@ def get_new_output_dir():
 OUTPUT_DIR = get_new_output_dir()
 print(f" 今回の出力先フォルダ: {OUTPUT_DIR}\n")
 
-def get_unique_filename(base_path):
+def get_unique_filename(filename):
     """ファイルが存在する場合、末尾に _1, _2... を付けて重複を回避する"""
-    # ファイルが存在しなければ、そのままのファイル名を返す
+    base_path = os.path.join(OUTPUT_DIR, filename)
+    
+    # ファイルが存在しなければ、そのままのファイルパスを返す
     if not os.path.exists(base_path):
         return base_path
-    name, ext = os.path.splitext(base_path)
+        
+    name, ext = os.path.splitext(filename)
     i = 1
     # 同じ名前のファイルが存在する限り、数字を増やし続ける
-    while os.path.exists(f"{name}_{i}{ext}"):
+    while os.path.exists(os.path.join(OUTPUT_DIR, f"{name}_{i}{ext}")):
         i += 1
-    # 見つかった空き番号でファイル名を作成して返す
-    return f"{name}_{i}{ext}"
+    # 見つかった空き番号でファイルパスを作成して返す
+    return os.path.join(OUTPUT_DIR, f"{name}_{i}{ext}")
 
-def save_model(model,cycle, acc, mode_str):
+def save_model(model, cycle, acc, mode_str):
     """モデルの重みとメタデータの保存"""
     weight_filename = f"model_weights_{mode_str}_cycle{cycle}.pt"
+    save_path = os.path.join(OUTPUT_DIR, weight_filename)
+    
     save_data = {
         'cycle': cycle,
         'best_score': acc,
         'model_state_dict': model.state_dict()
     }
-    torch.save(save_data, weight_filename)
-    print(f"モデルを'{weight_filename}'に保存しました．")
+    torch.save(save_data, save_path)
+    print(f"モデルを'{save_path}'に保存しました．")
     
-def save_logs(all_evaluation_results,all_annotated_records, mode_str):
+def save_logs(all_evaluation_results, all_annotated_records, mode_str):
     "評価結果の保存"
     final_eval_df = pd.concat(all_evaluation_results, ignore_index=True)
     eval_csv_name = get_unique_filename(f'detailed_predictions_log_{mode_str}.csv')
@@ -55,4 +60,3 @@ def save_logs(all_evaluation_results,all_annotated_records, mode_str):
     eval_annotated_csv_name = get_unique_filename(f'annotated_data_log_{mode_str}.csv')
     final_eval_annotated_df.to_csv(eval_annotated_csv_name, index=False)
     print(f"すべてのアノテーションデータを'{eval_annotated_csv_name}'に保存しました.")
-    
