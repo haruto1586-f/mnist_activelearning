@@ -1,4 +1,4 @@
-import visualize_streamlit as st
+import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.figure_factory as ff
