@@ -3,7 +3,21 @@ import torch
 import pandas as pd
 
 # 保存先のフォルダ名を指定
-OUTPUT_DIR = "output"
+def get_new_output_dir():
+    """連番の新しい出力ディレクトリ(output_1, output_2...)を作成して返す"""
+    base_name = "output"
+    i = 1
+    while True:
+        dir_name = f"{base_name}_{i}"
+        # フォルダが存在しなければ作成してそのパスを返す
+        if not os.path.exists(dir_name):
+            os.makedirs(dir_name)
+            return dir_name
+        i += 1
+
+# logger.pyが読み込まれた時に1度だけ実行され、今回の実験用のフォルダが決定する
+OUTPUT_DIR = get_new_output_dir()
+print(f" 今回の出力先フォルダ: {OUTPUT_DIR}\n")
 
 def get_unique_filename(base_path):
     """ファイルが存在する場合、末尾に _1, _2... を付けて重複を回避する"""
