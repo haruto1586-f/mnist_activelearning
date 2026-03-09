@@ -270,7 +270,7 @@ def main():
     print(f"Output directory initialized: {output_dir}")
 
     # --- 実験設定 ---
-    NUM_CYCLES = 5            
+    NUM_CYCLES = 60            
     INITIAL_TRAIN_SIZE = 1000 
     QUERY_SIZE = 1000         
     EPOCHS = 3

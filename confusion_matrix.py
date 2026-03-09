@@ -3,14 +3,17 @@ import plotly.express as px
 from sklearn.metrics import confusion_matrix
 import os
 import glob
+import sys # 追加
 
-def get_latest_output_dir():
-    """最新の output_X フォルダを取得する。なければカレントディレクトリを返す。"""
+def get_target_dir():
+    """コマンドライン引数があればそれを、なければ最新を取得する"""
+    if len(sys.argv) > 1:
+        return sys.argv[1]
+        
     dirs = [d for d in glob.glob("output_*") if os.path.isdir(d)]
     if not dirs:
-        return "." # outputフォルダがない場合はカレントディレクトリを対象とする
+        return "." 
     
-    # フォルダ名末尾の数字部分でソートして一番大きいものを返す
     def extract_num(d):
         try:
             return int(d.split('_')[-1])
@@ -18,6 +21,8 @@ def get_latest_output_dir():
             return -1
             
     return max(dirs, key=extract_num)
+
+OUTPUT_DIR = get_target_dir()
 
 def process_all_confusion_matrices(output_dir):
     """
