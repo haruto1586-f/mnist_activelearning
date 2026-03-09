@@ -11,26 +11,27 @@ import plotly.express as px
 import umap
 from sklearn.neighbors import KNeighborsClassifier
 import glob
-from model import get_resnet50_for_mnist  # これまで使っていたモデル定義を読み込む
+import sys # 追加
+from model import get_resnet50_for_mnist
 
-def get_latest_output_dir():
-    """最新の output_X フォルダを取得する"""
+def get_target_dir():
+    """コマンドライン引数があればそれを、なければ最新を取得する"""
+    if len(sys.argv) > 1:
+        return sys.argv[1]
+    
     dirs = [d for d in glob.glob("output_*") if os.path.isdir(d)]
     if not dirs:
         return None
     
-    # フォルダ名末尾の数字部分でソートして一番大きいものを返す
     def extract_num(d):
         try:
             return int(d.split('_')[-1])
         except ValueError:
             return -1
             
-    latest_dir = max(dirs, key=extract_num)
-    return latest_dir
+    return max(dirs, key=extract_num)
 
-# 最新のフォルダを自動取得
-OUTPUT_DIR = get_latest_output_dir()
+OUTPUT_DIR = get_target_dir()
 
 def extract_features(model, dataloader, device):
     """モデルの特徴抽出部分を使って特徴量を抽出する関数"""
