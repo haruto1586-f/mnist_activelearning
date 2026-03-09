@@ -159,9 +159,9 @@ def evaluate_model(model, test_loader, device, cycle, epoch=None):
 # ==========================================
 # ログ・保存関連 (logger.py)
 # ==========================================
-def save_model(model, cycle, acc, mode_str):
+def save_model(model, cycle, acc, mode_str, output_dir):
     """モデルの重みとメタデータの保存（上書き）"""
-    weight_filename = f"model_weights_{mode_str}_cycle{cycle}.pt"
+    weight_filename = os.path.join(output_dir, f"model_weights_{mode_str}_cycle{cycle}.pt")
     save_data = {
         'cycle': cycle,
         'best_score': acc,
@@ -170,15 +170,15 @@ def save_model(model, cycle, acc, mode_str):
     torch.save(save_data, weight_filename)
     print(f"モデルを'{weight_filename}'に保存しました．(上書き)")
     
-def save_logs(all_evaluation_results, all_annotated_records, mode_str):
+def save_logs(all_evaluation_results, all_annotated_records, mode_str, output_dir):
     """評価結果とアノテーション結果の保存（上書き）"""
     final_eval_df = pd.concat(all_evaluation_results, ignore_index=True)
-    eval_csv_name = f'detailed_predictions_log_{mode_str}.csv'
+    eval_csv_name = os.path.join(output_dir, f'detailed_predictions_log_{mode_str}.csv')
     final_eval_df.to_csv(eval_csv_name, index=False)
     print(f"すべての予測データを'{eval_csv_name}'に保存しました。(上書き)")
     
     final_eval_annotated_df = pd.concat(all_annotated_records, ignore_index=True)
-    eval_annotated_csv_name = f'annotated_data_log_{mode_str}.csv'
+    eval_annotated_csv_name = os.path.join(output_dir, f'annotated_data_log_{mode_str}.csv')
     final_eval_annotated_df.to_csv(eval_annotated_csv_name, index=False)
     print(f"すべてのアノテーションデータを'{eval_annotated_csv_name}'に保存しました.(上書き)")
 
@@ -204,7 +204,7 @@ def extract_features(model, dataloader, device):
     model.fc = original_fc
     return np.vstack(all_features), np.concatenate(all_labels)
 
-def generate_umap_for_cycle(model, device, cycle, mode_str, newly_added_indices, test_loader, train_dataset):
+def generate_umap_for_cycle(model, device, cycle, mode_str, newly_added_indices, test_loader, train_dataset, output_dir):
     """指定されたサイクルのUMAPとKNN決定境界を生成して保存する"""
     print(f"[{mode_str.upper()} - Cycle {cycle}] UMAP可視化を生成中...")
     
@@ -251,9 +251,8 @@ def generate_umap_for_cycle(model, device, cycle, mode_str, newly_added_indices,
     plt.ylabel('UMAP Dimension 2', fontsize=12)
     plt.tight_layout()
     
-    save_name = f'umap_{mode_str}_cycle{cycle}.png'
+    save_name = os.path.join(output_dir, f'umap_{mode_str}_cycle{cycle}.png')
     plt.savefig(save_name)
-    # plt.show() # ローカル実行時にウィンドウで処理が止まるのを防ぐためコメントアウト
     plt.close() # メモリ解放
     print(f"▶ グラフを '{save_name}' に保存しました\n")
 
@@ -264,6 +263,11 @@ def generate_umap_for_cycle(model, device, cycle, mode_str, newly_added_indices,
 def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
+
+    # 出力先ディレクトリの設定
+    output_dir = "output_0"
+    os.makedirs(output_dir, exist_ok=True)
+    print(f"Output directory initialized: {output_dir}")
 
     # --- 実験設定 ---
     NUM_CYCLES = 5            
@@ -338,7 +342,7 @@ def main():
             print(f"Accuracy: {acc:.4f}")
             
             all_evaluation_results.append(df_results)
-            save_model(model, cycle + 1, acc, mode_str)
+            save_model(model, cycle + 1, acc, mode_str, output_dir)
             
             generate_umap_for_cycle(
                 model=model, 
@@ -347,7 +351,8 @@ def main():
                 mode_str=mode_str, 
                 newly_added_indices=just_added_indices, 
                 test_loader=umap_test_loader, 
-                train_dataset=train_dataset
+                train_dataset=train_dataset,
+                output_dir=output_dir
             )
             
             if cycle < NUM_CYCLES - 1 and len(unlabeled_indices) > 0:
@@ -372,7 +377,7 @@ def main():
                 
                 just_added_indices = new_indices
                 
-        save_logs(all_evaluation_results, all_annotated_records, mode_str)
+        save_logs(all_evaluation_results, all_annotated_records, mode_str, output_dir)
 
 if __name__ == "__main__":
     main()
