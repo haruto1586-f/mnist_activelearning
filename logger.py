@@ -2,6 +2,9 @@ import os
 import torch
 import pandas as pd
 
+# 保存先のフォルダ名を指定
+OUTPUT_DIR = "output"
+
 def get_unique_filename(base_path):
     """ファイルが存在する場合、末尾に _1, _2... を付けて重複を回避する"""
     # ファイルが存在しなければ、そのままのファイル名を返す
