@@ -1,66 +1,104 @@
 import pandas as pd
-import matplotlib.pyplot as plt
-import seaborn as sns
+import plotly.express as px
 from sklearn.metrics import confusion_matrix
 import os
+import glob
 
-def plot_confusion_matrix(csv_filename, target_cycle):
+def get_latest_output_dir():
+    """最新の output_X フォルダを取得する。なければカレントディレクトリを返す。"""
+    dirs = [d for d in glob.glob("output_*") if os.path.isdir(d)]
+    if not dirs:
+        return "." # outputフォルダがない場合はカレントディレクトリを対象とする
+    
+    # フォルダ名末尾の数字部分でソートして一番大きいものを返す
+    def extract_num(d):
+        try:
+            return int(d.split('_')[-1])
+        except ValueError:
+            return -1
+            
+    return max(dirs, key=extract_num)
+
+def process_all_confusion_matrices(output_dir):
     """
-    指定したCSVファイルとサイクル数から混同行列を描画・保存する関数
+    指定ディレクトリ内のすべての予測ログCSVを読み込み、
+    すべてのサイクルの混同行列(HTMLとCSV)を作成・保存する
     """
-    if not os.path.exists(csv_filename):
-        print(f"❌ エラー: '{csv_filename}' が見つかりません。ファイル名を確認してください。")
+    # 対象となるCSVファイルをすべて取得
+    csv_files = glob.glob(os.path.join(output_dir, "detailed_predictions_log_*.csv"))
+    
+    if not csv_files:
+        print(f"❌ '{output_dir}' 内に予測ログファイルが見つかりません。")
         return
 
-    df = pd.read_csv(csv_filename)
+    # 見つかったすべてのCSVファイルに対してループ処理
+    for csv_filename in csv_files:
+        print(f"\n📄 ファイル処理中: {os.path.basename(csv_filename)}")
+        df = pd.read_csv(csv_filename)
 
-    true_col = 'True_Label' if 'True_Label' in df.columns else 'True Label'
-    pred_col = 'Predicted' if 'Predicted' in df.columns else 'Predicted Label'
+        # カラム名の揺れに対応
+        true_col = 'True_Label' if 'True_Label' in df.columns else 'True Label'
+        pred_col = 'Predicted' if 'Predicted' in df.columns else 'Predicted Label'
 
-    df_cycle = df[df['Cycle'] == target_cycle]
-    if df_cycle.empty:
-        print(f"❌ エラー: Cycle {target_cycle} のデータがCSV内にありません。")
-        return
+        if 'Cycle' not in df.columns:
+            print(f"⚠️ '{csv_filename}' に 'Cycle' カラムがありません。スキップします。")
+            continue
+            
+        # CSV内に存在するすべてのサイクルを抽出してソート
+        cycles = sorted(df['Cycle'].unique())
+        
+        # サイクルごとにループ処理
+        for target_cycle in cycles:
+            df_cycle = df[df['Cycle'] == target_cycle]
+            if df_cycle.empty:
+                continue
 
-    y_true = df_cycle[true_col]
-    y_pred = df_cycle[pred_col]
+            y_true = df_cycle[true_col]
+            y_pred = df_cycle[pred_col]
 
-    cm = confusion_matrix(y_true, y_pred, labels=range(10))
-    
-    cm_df = pd.DataFrame(cm, index=range(10), columns=range(10))
-    cm_df.index.name = 'True \\ Pred' # Excelで開いた時に左上に表示される名前
+            # 混同行列の計算
+            cm = confusion_matrix(y_true, y_pred, labels=range(10))
+            
+            cm_df = pd.DataFrame(cm, index=range(10), columns=range(10))
+            cm_df.index.name = 'True \ Pred'
 
-    plt.figure(figsize=(10, 8))
-    
-    # ヒートマップを変数 'ax' として受け取る
-    ax = sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', 
-                     xticklabels=range(10), yticklabels=range(10))
+            mode_str = df_cycle['Mode'].iloc[0] if 'Mode' in df.columns else 'Unknown'
 
-    mode_str = df_cycle['Mode'].iloc[0] if 'Mode' in df.columns else 'Unknown'
+            # Plotly Expressのimshow(ヒートマップ)を使って描画
+            fig = px.imshow(
+                cm,
+                text_auto=True,  # 各マスに数値を表示
+                color_continuous_scale='Blues', # 青系のグラデーション
+                labels=dict(x="Predicted Label (AIの予測)", y="True Label (実際の正解)", color="Count"),
+                x=[str(i) for i in range(10)],
+                y=[str(i) for i in range(10)],
+                title=f'Confusion Matrix (Mode: {mode_str}, Cycle: {target_cycle})'
+            )
+            
+            # レイアウトの微調整
+            fig.update_layout(
+                xaxis=dict(tickmode='linear', side='top'), 
+                yaxis=dict(tickmode='linear'),
+                width=800,
+                height=800,
+                template='plotly_white'
+            )
 
-    plt.title(f'Confusion Matrix (Mode: {mode_str}, Cycle: {target_cycle})\n', fontsize=16)
-    
-    ax.xaxis.tick_top()  # メモリ（0〜9の数字）を上に移動
-    ax.xaxis.set_label_position('top')  # 軸のラベル（テキスト）を上に移動
-    
-    plt.xlabel('Predicted Label (AIの予測)', fontsize=14, labelpad=10)
-    plt.ylabel('True Label (実際の正解)', fontsize=14)
-    plt.tight_layout()
-
-    base_name = os.path.splitext(os.path.basename(csv_filename))[0]
-    save_name = f'confusion_matrix_{base_name}_cycle{target_cycle}.png'
-    
-    plt.savefig(save_name)
-    print(f"✅ 混同行列のグラフを '{save_name}' に保存しました！")
-    
-    csv_save_name = f'confusion_matrix_{base_name}_cycle{target_cycle}.csv'
-    cm_df.to_csv(csv_save_name)
-    print(f"✅ 混同行列のデータを '{csv_save_name}' に保存しました！")
-
-    plt.show()
+            base_name = os.path.splitext(os.path.basename(csv_filename))[0]
+            
+            # インタラクティブなHTMLとして保存
+            save_name_html = os.path.join(output_dir, f'confusion_matrix_{base_name}_cycle{target_cycle}.html')
+            fig.write_html(save_name_html)
+            
+            # 混同行列をCSVとしても保存
+            csv_save_name = os.path.join(output_dir, f'confusion_matrix_{base_name}_cycle{target_cycle}.csv')
+            cm_df.to_csv(csv_save_name)
+            
+            print(f"  ✅ Cycle {target_cycle} のグラフとデータを保存しました！")
 
 if __name__ == '__main__':
-    target_csv = 'detailed_predictions_log_continue.csv'  # または 'detailed_predictions_log_reset.csv'
-    target_cycle = 5  # 見たいサイクル数（1〜5）
+    # 最新の実験フォルダを自動取得して一括処理
+    target_dir = get_latest_output_dir()
+    print(f"📁 読み込み・保存対象フォルダ: {target_dir}")
     
-    plot_confusion_matrix(target_csv, target_cycle)
+    process_all_confusion_matrices(target_dir)
