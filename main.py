@@ -20,7 +20,7 @@ def main():
     EPOCHS = 3
     
     #reset_model_each_cycle = True   # True:毎サイクル初期化, False:継続学習
-    sampling_strategy = 'entropy'   # 'entropy' または 'manual'
+    sampling_strategy = 'manual'   # 'entropy' または 'manual'
 
     # 1. データの準備
     train_dataset, test_dataset = get_mnist_datasets()
@@ -100,7 +100,7 @@ def main():
                         device
                     )
                 elif sampling_strategy == 'manual':
-                    manual_counts = {0: 10, 1: 10, 2: 10, 3: 10, 4: 10, 5: 10, 6: 10, 7: 10, 8: 10, 9: 10} # 各クラスから均等にサンプリング
+                    manual_counts = {0: 11, 1: 11, 2: 11, 3: 11, 4: 11, 5: 11, 6: 11, 7: 11, 8: 0, 9: 12} # 各クラスから均等にサンプリング
                     new_indices, new_entropies, new_confidences = manual_class_sampling(unlabeled_indices, train_dataset, manual_counts)
 
                 for i, idx in enumerate(new_indices):
