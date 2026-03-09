@@ -208,7 +208,37 @@ def main():
         
     weight_files.sort()
 
+    files_to_process = []
     for weight_path in weight_files:
+        base_weight_name = os.path.splitext(os.path.basename(weight_path))[0]
+        html_path = os.path.join(OUTPUT_DIR, f'decision_boundary_{base_weight_name}.html')
+        png_path = os.path.join(OUTPUT_DIR, f'decision_boundary_{base_weight_name}.png')
+        
+        if os.path.exists(html_path) or os.path.exists(png_path):
+            print(f"⏩ スキップ: 既にグラフが存在します ({base_weight_name})")
+        else:
+            files_to_process.append(weight_path)
+
+    # 処理すべきファイルがない場合は、データセットの読み込みすら行わずに終了
+    if not files_to_process:
+        print("\n✅ すべてのサイクルの決定境界グラフが既に生成されています。")
+        return
+
+    # === データの準備 (処理が必要なファイルがある場合のみ実行) ===
+    print("\nデータセットをロードしています...")
+    transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.5,), (0.5,))
+    ])
+    test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
+    train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
+
+    np.random.seed(42)
+    subset_indices = np.random.choice(len(test_dataset), 2000, replace=False)
+    test_loader = DataLoader(Subset(test_dataset, subset_indices), batch_size=256, shuffle=False)
+
+    # 必要なファイルだけを推論・描画
+    for weight_path in files_to_process:
         filename = os.path.basename(weight_path)
         match = re.search(r"model_weights_(reset|continue)_cycle(\d+)\.pt", filename)
         
@@ -219,7 +249,7 @@ def main():
         else:
             print(f" ファイル '{filename}' からモードとサイクルを抽出できませんでした。スキップします。")
 
-    print("\n すべてのサイクルの可視化と保存が完了しました！")
+    print(f"\n✅ {OUTPUT_DIR} の決定境界グラフの生成処理が完了しました！")
 
 if __name__ == '__main__':
     main()
