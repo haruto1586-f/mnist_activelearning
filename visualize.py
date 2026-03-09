@@ -166,7 +166,7 @@ def process_and_plot(weight_path, mode_str, target_cycle, test_loader, train_dat
             mode='markers',
             marker=dict(
                 # ===【修正部分】星マークを小さく、枠を細くする ===
-                size=10,                   # 18 から 10 に縮小
+                size=8,                   # 18 から 10 に縮小
                 symbol='star',             
                 color='rgba(0,0,0,0)',     
                 line=dict(width=2, color='red') # 太さ 3 から 2 に変更

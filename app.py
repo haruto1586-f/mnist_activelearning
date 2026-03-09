@@ -181,6 +181,7 @@ with tab1:
                     legend_title="Predicted As"
                 )
                 fig_sub.update_xaxes(range=[-0.05, 1.05])
+                fig_sub.add_hline(x=0.5, line_dash="dash", line_color="gray", annotation_text="0.5", annotation_position="top left")
                 st.plotly_chart(fig_sub, use_container_width=True)
             else:
                 st.info("各予測クラスへの誤分類が1件以下の場合、KDEは描画されません。")
