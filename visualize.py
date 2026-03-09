@@ -1,18 +1,18 @@
 import os
+import sys
+import glob
+import re
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader, Subset
 from torchvision import datasets, transforms
 import numpy as np
 import pandas as pd
-import re
 import plotly.graph_objects as go
 import plotly.express as px
 import umap
 from sklearn.neighbors import KNeighborsClassifier
-import glob
-import sys # 追加
-from model import get_resnet50_for_mnist
+from model import get_resnet50_for_mnist  
 
 def get_target_dir():
     """コマンドライン引数があればそれを、なければ最新を取得する"""
@@ -64,7 +64,7 @@ def process_and_plot(weight_path, mode_str, target_cycle, test_loader, train_dat
         torch.serialization.add_safe_globals([np._core.multiarray.scalar])
         checkpoint = torch.load(weight_path, map_location=device, weights_only=False)
         model.load_state_dict(checkpoint['model_state_dict'])
-        print(f"モデル '{weight_path}' をロードしました。")
+        print(f"モデル '{os.path.basename(weight_path)}' をロードしました。")
     except FileNotFoundError:
         print(f"指定された重みファイル '{weight_path}' が見つかりませんでした。")
         return
@@ -80,7 +80,7 @@ def process_and_plot(weight_path, mode_str, target_cycle, test_loader, train_dat
     
     # 4. 2次元空間上で代理モデル(k-NN)を学習
     print("k-NNで決定境界を学習中...")
-    knn = KNeighborsClassifier(n_neighbors=5)  # k=5のk近傍法を使用
+    knn = KNeighborsClassifier(n_neighbors=5)
     knn.fit(features_2d, labels)
     
     # 5. アノテーションされたデータの抽出と配置
@@ -116,23 +116,37 @@ def process_and_plot(weight_path, mode_str, target_cycle, test_loader, train_dat
     Z = knn.predict(np.c_[xx.ravel(), yy.ravel()])
     Z = Z.reshape(xx.shape)
     
-    # 7. グラフの描画
-    print("グラフを描画中...")
+    # 7. Plotlyでグラフの描画
+    print("Plotlyでグラフを描画中...")
     fig = go.Figure()
+
+    # データ点の描画に使用する定性的カラーを取得
+    plotly_colors = px.colors.qualitative.Plotly 
     
-    # 決定境界をContour（等高線）で描画
-    fig.add_trace(go.Contour(
+    # 決定境界用のカスタム定性的カラースケールを作成
+    custom_colorscale = []
+    num_classes = 10
+    for i in range(num_classes):
+        start_norm = i / num_classes
+        end_norm = (i + 1) / num_classes
+        color = plotly_colors[i % len(plotly_colors)]
+        custom_colorscale.append([start_norm, color])
+        custom_colorscale.append([end_norm, color])
+
+    # 決定境界をHeatmapで描画
+    fig.add_trace(go.Heatmap(
         x=np.arange(x_min, x_max, 0.1),
         y=np.arange(y_min, y_max, 0.1),
         z=Z,
-        colorscale='Plotly3', # Plotly標準のカラースケール
-        opacity=0.3,          # 背景として薄く表示
-        showscale=True,      # カラーバーは表示
-        hoverinfo='skip'      # ホバー時の情報は表示しない
+        colorscale=custom_colorscale,
+        # ===【修正部分】背景色を薄くする ===
+        opacity=0.35,          # 1.0 (鮮やか) から 0.35 (薄く) に変更
+        # ================================
+        showscale=False,      
+        hoverinfo='skip'      
     ))
 
     # クラスごとに散布図（Scatter）を描画
-    plotly_colors = px.colors.qualitative.Plotly
     for i in range(10):
         idx = labels == i
         fig.add_trace(go.Scatter(
@@ -145,24 +159,24 @@ def process_and_plot(weight_path, mode_str, target_cycle, test_loader, train_dat
             hoverinfo='text+x+y'
         ))
 
-    # アノテーションされたデータを赤色の星マークで追加
     if annotated_features_2d is not None:
         fig.add_trace(go.Scatter(
             x=annotated_features_2d[:, 0],
             y=annotated_features_2d[:, 1],
             mode='markers',
             marker=dict(
-                size=18,           # 少し大きめに設定
-                symbol='star',             # 星型
-                color='rgba(0,0,0,0)',     # 中身を透明にする
-                line=dict(width=3, color='red') # 赤くて太い枠線
+                # ===【修正部分】星マークを小さく、枠を細くする ===
+                size=10,                   # 18 から 10 に縮小
+                symbol='star',             
+                color='rgba(0,0,0,0)',     
+                line=dict(width=2, color='red') # 太さ 3 から 2 に変更
+                # ============================================
             ),
             name=label_text,
             text=[label_text] * len(annotated_features_2d),
             hoverinfo='text+x+y'
         ))
 
-    # レイアウトの調整
     fig.update_layout(
         title=f'UMAP Feature Space & Decision Boundary<br>(Mode: {mode_str}, Cycle: {target_cycle})',
         xaxis_title='UMAP Dimension 1',
@@ -170,10 +184,9 @@ def process_and_plot(weight_path, mode_str, target_cycle, test_loader, train_dat
         width=1000,
         height=800,
         legend_title='Digit Class',
-        template='plotly_white' # 背景を白にする
+        template='plotly_white' 
     )
     
-    # 画像（HTML）として保存
     base_weight_name = os.path.splitext(os.path.basename(weight_path))[0]
     save_name = os.path.join(OUTPUT_DIR, f'decision_boundary_{base_weight_name}.html')
     fig.write_html(save_name)
@@ -183,23 +196,10 @@ def main():
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
     
-    if not os.path.exists(OUTPUT_DIR):
-        print(f"エラー: '{OUTPUT_DIR}' フォルダが存在しません。先に学習(main.py)を実行してください。")
+    if OUTPUT_DIR is None or not os.path.exists(OUTPUT_DIR):
+        print(f"エラー: 出力フォルダが存在しません。先に学習(main.py)を実行してください。")
         return
 
-    # データの準備
-    transform = transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.5,), (0.5,))
-    ])
-    test_dataset = datasets.MNIST(root='./data', train=False, download=True, transform=transform)
-    train_dataset = datasets.MNIST(root='./data', train=True, download=True, transform=transform)
-
-    np.random.seed(42)
-    subset_indices = np.random.choice(len(test_dataset), 2000, replace=False)
-    test_loader = DataLoader(Subset(test_dataset, subset_indices), batch_size=256, shuffle=False)
-
-    # outputフォルダ内のすべての model_weights_*.pt ファイルを取得
     weight_files = glob.glob(os.path.join(OUTPUT_DIR, "model_weights_*.pt"))
     
     if not weight_files:
@@ -208,6 +208,7 @@ def main():
         
     weight_files.sort()
 
+    # すでに画像が存在するかチェック
     files_to_process = []
     for weight_path in weight_files:
         base_weight_name = os.path.splitext(os.path.basename(weight_path))[0]
@@ -219,12 +220,12 @@ def main():
         else:
             files_to_process.append(weight_path)
 
-    # 処理すべきファイルがない場合は、データセットの読み込みすら行わずに終了
+    # 処理すべきファイルがない場合は終了
     if not files_to_process:
-        print("\n✅ すべてのサイクルの決定境界グラフが既に生成されています。")
+        print("\n✅ 処理すべき重みファイルがありません。")
         return
 
-    # === データの準備 (処理が必要なファイルがある場合のみ実行) ===
+    # データの準備
     print("\nデータセットをロードしています...")
     transform = transforms.Compose([
         transforms.ToTensor(),
@@ -237,7 +238,7 @@ def main():
     subset_indices = np.random.choice(len(test_dataset), 2000, replace=False)
     test_loader = DataLoader(Subset(test_dataset, subset_indices), batch_size=256, shuffle=False)
 
-    # 必要なファイルだけを推論・描画
+    # 推論・描画
     for weight_path in files_to_process:
         filename = os.path.basename(weight_path)
         match = re.search(r"model_weights_(reset|continue)_cycle(\d+)\.pt", filename)
@@ -247,7 +248,7 @@ def main():
             target_cycle = int(match.group(2))
             process_and_plot(weight_path, mode_str, target_cycle, test_loader, train_dataset, device)
         else:
-            print(f" ファイル '{filename}' からモードとサイクルを抽出できませんでした。スキップします。")
+            print(f"⚠️ ファイル '{filename}' からモードとサイクルを抽出できませんでした。スキップします。")
 
     print(f"\n✅ {OUTPUT_DIR} の決定境界グラフの生成処理が完了しました！")
 

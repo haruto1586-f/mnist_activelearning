@@ -70,30 +70,30 @@ def process_all_confusion_matrices(output_dir):
             mode_str = df_cycle['Mode'].iloc[0] if 'Mode' in df.columns else 'Unknown'
 
             # Plotly Expressのimshow(ヒートマップ)を使って描画
-            fig = px.imshow(
-                cm,
-                text_auto=True,  # 各マスに数値を表示
-                color_continuous_scale='Blues', # 青系のグラデーション
-                labels=dict(x="Predicted Label (AIの予測)", y="True Label (実際の正解)", color="Count"),
-                x=[str(i) for i in range(10)],
-                y=[str(i) for i in range(10)],
-                title=f'Confusion Matrix (Mode: {mode_str}, Cycle: {target_cycle})'
-            )
+            # fig = px.imshow(
+            #     cm,
+            #     text_auto=True,  # 各マスに数値を表示
+            #     color_continuous_scale='Blues', # 青系のグラデーション
+            #     labels=dict(x="Predicted Label (AIの予測)", y="True Label (実際の正解)", color="Count"),
+            #     x=[str(i) for i in range(10)],
+            #     y=[str(i) for i in range(10)],
+            #     title=f'Confusion Matrix (Mode: {mode_str}, Cycle: {target_cycle})'
+            # )
             
-            # レイアウトの微調整
-            fig.update_layout(
-                xaxis=dict(tickmode='linear', side='top'), 
-                yaxis=dict(tickmode='linear'),
-                width=800,
-                height=800,
-                template='plotly_white'
-            )
+            # # レイアウトの微調整
+            # fig.update_layout(
+            #     xaxis=dict(tickmode='linear', side='top'), 
+            #     yaxis=dict(tickmode='linear'),
+            #     width=800,
+            #     height=800,
+            #     template='plotly_white'
+            # )
 
             base_name = os.path.splitext(os.path.basename(csv_filename))[0]
             
             # インタラクティブなHTMLとして保存
-            save_name_html = os.path.join(output_dir, f'confusion_matrix_{base_name}_cycle{target_cycle}.html')
-            fig.write_html(save_name_html)
+            # save_name_html = os.path.join(output_dir, f'confusion_matrix_{base_name}_cycle{target_cycle}.html')
+            # fig.write_html(save_name_html)
             
             # 混同行列をCSVとしても保存
             csv_save_name = os.path.join(output_dir, f'confusion_matrix_{base_name}_cycle{target_cycle}.csv')
@@ -103,7 +103,7 @@ def process_all_confusion_matrices(output_dir):
 
 if __name__ == '__main__':
     # 最新の実験フォルダを自動取得して一括処理
-    target_dir = get_latest_output_dir()
+    target_dir = OUTPUT_DIR
     print(f"📁 読み込み・保存対象フォルダ: {target_dir}")
     
     process_all_confusion_matrices(target_dir)

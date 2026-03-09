@@ -62,13 +62,12 @@ st.sidebar.header("⚙️ 共通設定")
 modes = sorted(df_logs['Mode'].unique())
 selected_mode = st.sidebar.selectbox("Mode (リセット/継続)", modes)
 
-# 全サイクルの一覧を取得し、サイドバーで選択できるようにする
+# 全サイクルの一覧を取得し、サイドバーでのみ選択できるように統一
 cycles = sorted(df_logs[df_logs['Mode'] == selected_mode]['Cycle'].unique())
 selected_cycle = st.sidebar.selectbox("Cycle (サイクル数)", cycles)
 
 # 選択されたモードとサイクルでデータをフィルタリング（全タブ共通）
 df_cycle = df_logs[(df_logs['Mode'] == selected_mode) & (df_logs['Cycle'] == selected_cycle)]
-
 
 # タブの作成
 tab1, tab2, tab3 = st.tabs(["📊 信頼度分布 (KDE/バイオリン)", "🔥 混同行列", "🗺️ 決定境界 (UMAP)"])
@@ -86,25 +85,26 @@ with tab1:
     if df_tp.empty:
         st.info("正解データがありません。")
     else:
-        # 色分けのためにクラスを文字列型に変換
         df_tp_plot = df_tp.copy()
         df_tp_plot['True Label'] = df_tp_plot['True Label'].astype(str)
 
-        # バイオリンプロット（箱ひげ図とすべてのデータ点を併記）
         fig_tp = px.violin(
             df_tp_plot,
             x="True Label",
             y="Confidence",
             color="True Label",
-            box=True,     # 箱ひげ図を表示
-            points="all", # すべてのデータ点を散らして表示
+            box=True,     
+            points="all", 
             title="正解したデータの信頼度分布（X軸：正解クラス、Y軸：信頼度）",
             labels={"True Label": "正解クラス", "Confidence": "信頼度"},
             category_orders={"True Label": [str(i) for i in range(10)]}
         )
         fig_tp.update_layout(template="plotly_white", width=900, height=600)
-        # 信頼度の軸を0〜1（+少しの余白）に固定
         fig_tp.update_yaxes(range=[-0.05, 1.05]) 
+        
+        # === 【追加】0.5の基準線 ===
+        fig_tp.add_hline(y=0.5, line_dash="dash", line_color="gray", annotation_text="0.5", annotation_position="top left")
+
         st.plotly_chart(fig_tp, use_container_width=True)
 
 
@@ -121,12 +121,10 @@ with tab1:
         ])
 
         if view_option == "すべての真値クラスをまとめて比較 (バイオリンプロット一覧)":
-            # 色をカテゴリとして扱うために文字列に変換
             df_wrong_plot = df_wrong.copy()
             df_wrong_plot['True Label'] = df_wrong_plot['True Label'].astype(str)
             df_wrong_plot['Predicted'] = df_wrong_plot['Predicted'].astype(str)
 
-            # バイオリンプロットに変更
             fig_wrong = px.violin(
                 df_wrong_plot, 
                 x="True Label", 
@@ -145,10 +143,13 @@ with tab1:
                 template="plotly_white", 
                 width=1000,  
                 height=600,
-                violinmode="group" # 予測クラスごとにバイオリンを横に並べる
+                violinmode="group" 
             )
-            # 信頼度の軸を0〜1に固定
             fig_wrong.update_yaxes(range=[-0.05, 1.05])
+
+            # === 【追加】0.5の基準線 ===
+            fig_wrong.add_hline(y=0.5, line_dash="dash", line_color="gray", annotation_text="0.5", annotation_position="top left")
+
             st.plotly_chart(fig_wrong, use_container_width=True)
 
         else:
@@ -179,7 +180,6 @@ with tab1:
                     template="plotly_white",
                     legend_title="Predicted As"
                 )
-                # X軸（KDEグラフでの信頼度軸）を0〜1に固定
                 fig_sub.update_xaxes(range=[-0.05, 1.05])
                 st.plotly_chart(fig_sub, use_container_width=True)
             else:
@@ -188,22 +188,37 @@ with tab1:
             if single_preds:
                 st.warning(f"※ データが1件のみのためKDE化されなかった予測クラス: {single_preds}")
 
-
 # ==========================================
 # Tab 2: 混同行列
 # ==========================================
 with tab2:
     st.header(f"混同行列 (Confusion Matrix) - Cycle {selected_cycle}")
-    st.markdown("`confusion_matrix.py` で生成された HTML を表示します。")
+    st.markdown("※ 予測ログ(CSV)から直接混同行列を計算して表示しています。")
     
-    html_file_cm = os.path.join(latest_dir, f"confusion_matrix_detailed_predictions_log_{selected_mode}_cycle{selected_cycle}.html")
+    # 選択されているサイクルのデータから直接混同行列を計算
+    y_true = df_cycle['True Label']
+    y_pred = df_cycle['Predicted']
 
-    if os.path.exists(html_file_cm):
-        with open(html_file_cm, 'r', encoding='utf-8') as f:
-            html_content_cm = f.read()
-        st.components.v1.html(html_content_cm, height=850, scrolling=True)
-    else:
-        st.warning(f"Cycle {selected_cycle} の混同行列グラフが見つかりません。先に confusion_matrix.py を実行してください。")
+    cm_df = pd.crosstab(y_true, y_pred, dropna=False)
+    # 0〜9のすべてのクラスが表に揃うように再インデックス
+    cm_df = cm_df.reindex(index=range(10), columns=range(10), fill_value=0)
+
+    fig_cm = px.imshow(
+        cm_df.values,
+        text_auto=True,
+        color_continuous_scale='Blues',
+        labels=dict(x="Predicted Label (AIの予測)", y="True Label (実際の正解)", color="Count"),
+        x=[str(i) for i in range(10)],
+        y=[str(i) for i in range(10)],
+    )
+    fig_cm.update_layout(
+        xaxis=dict(tickmode='linear', side='top'),
+        yaxis=dict(tickmode='linear'),
+        width=700,
+        height=700,
+        template='plotly_white'
+    )
+    st.plotly_chart(fig_cm, use_container_width=True)
 
 
 # ==========================================
