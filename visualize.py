@@ -289,8 +289,8 @@ def main():
     files_to_process = []
     for weight_path in weight_files:
         base_weight_name = os.path.splitext(os.path.basename(weight_path))[0]
-        html_path = os.path.join(OUTPUT_DIR, f'decision_boundary_{base_weight_name}.html')
-        png_path = os.path.join(OUTPUT_DIR, f'decision_boundary_{base_weight_name}.png')
+        html_path = os.path.join(OUTPUT_DIR, f'uncertainty_map_{base_weight_name}.html')
+        png_path = os.path.join(OUTPUT_DIR, f'uncertainty_map_{base_weight_name}.png')
         
         if os.path.exists(html_path) or os.path.exists(png_path):
             print(f"⏩ スキップ: 既にグラフが存在します ({base_weight_name})")
