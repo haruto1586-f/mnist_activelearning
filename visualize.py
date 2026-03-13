@@ -11,7 +11,8 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 import umap
-from sklearn.neighbors import KNeighborsClassifier
+#from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neighbors import KNeighborsRegressor
 from model import get_resnet50_for_mnist  
 
 def get_target_dir():
@@ -43,16 +44,22 @@ def extract_features(model, dataloader, device):
     
     all_features = []
     all_labels = []
+    all_entropies = []
     
     with torch.no_grad():
         for inputs, labels in dataloader:
             inputs = inputs.to(device)
             features = model(inputs)
+            logits = model(inputs)
+            probs = torch.softmax(logits, dim=1)
+            entropy = -torch.sum(probs * torch.log(probs + 1e-9), dim=1)
             all_features.append(features.cpu().numpy())
+            all_entropies.append(entropy.cpu().numpy())
             all_labels.append(labels.cpu().numpy())
             
+            
     model.fc = original_fc  # 最終層を元に戻す
-    return np.vstack(all_features), np.concatenate(all_labels)
+    return np.vstack(all_features), np.concatenate(all_labels), np.concatenate(all_entropies)
 
 def process_and_plot(weight_path, mode_str, target_cycle, test_loader, train_dataset, device):
     """1つのサイクルの重みを読み込み、可視化して保存する処理"""
@@ -71,7 +78,7 @@ def process_and_plot(weight_path, mode_str, target_cycle, test_loader, train_dat
     
     # 2. 特徴量の抽出
     print("特徴量を抽出中...")
-    features_2048d, labels = extract_features(model, test_loader, device)
+    features_2048d, labels, entropies = extract_features(model, test_loader, device)
     
     # 3. UMAPで次元削減
     print("UMAPで次元削減中...")
@@ -79,9 +86,13 @@ def process_and_plot(weight_path, mode_str, target_cycle, test_loader, train_dat
     features_2d = reducer.fit_transform(features_2048d)
     
     # 4. 2次元空間上で代理モデル(k-NN)を学習
-    print("k-NNで決定境界を学習中...")
-    knn = KNeighborsClassifier(n_neighbors=5)
-    knn.fit(features_2d, labels)
+    # print("k-NNで決定境界を学習中...")
+    # knn = KNeighborsClassifier(n_neighbors=5)
+    # knn.fit(features_2d, labels)
+    print("k-NN(回帰)で不確実性の空間分布を学習中...")
+    # クラス分類用のknn_classifierを削除し、エントロピー予測用のみにする
+    knn_regressor = KNeighborsRegressor(n_neighbors=5)
+    knn_regressor.fit(features_2d, entropies)
     
     # 5. アノテーションされたデータの抽出と配置
     csv_filename = os.path.join(OUTPUT_DIR, f'annotated_data_log_{mode_str}.csv')
@@ -100,7 +111,7 @@ def process_and_plot(weight_path, mode_str, target_cycle, test_loader, train_dat
             
         if new_indices:
             annotated_loader = DataLoader(Subset(train_dataset, new_indices), batch_size=256, shuffle=False)
-            annotated_features_2048d, _ = extract_features(model, annotated_loader, device)
+            annotated_features_2048d, _, _ = extract_features(model, annotated_loader, device)
             # すでに作った2次元の地図(reducer)に当てはめる
             annotated_features_2d = reducer.transform(annotated_features_2048d)
             print(f"新たにアノテーションされた {len(new_indices)} 件のデータを配置しました！")
@@ -113,40 +124,106 @@ def process_and_plot(weight_path, mode_str, target_cycle, test_loader, train_dat
     xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.1),
                          np.arange(y_min, y_max, 0.1))
     
-    Z = knn.predict(np.c_[xx.ravel(), yy.ravel()])
-    Z = Z.reshape(xx.shape)
+    mesh_points = np.c_[xx.ravel(), yy.ravel()]
+    # 背景の「不確実性（エントロピー）」を予測
+    Z_entropy = knn_regressor.predict(mesh_points)
+    Z_entropy = Z_entropy.reshape(xx.shape)
+    
+    # Z = knn.predict(np.c_[xx.ravel(), yy.ravel()])
+    # Z = Z.reshape(xx.shape)
     
     # 7. Plotlyでグラフの描画
     print("Plotlyでグラフを描画中...")
     fig = go.Figure()
 
-    # データ点の描画に使用する定性的カラーを取得
-    plotly_colors = px.colors.qualitative.Plotly 
+    # # データ点の描画に使用する定性的カラーを取得
+    # plotly_colors = px.colors.qualitative.Plotly 
     
-    # 決定境界用のカスタム定性的カラースケールを作成
-    custom_colorscale = []
-    num_classes = 10
-    for i in range(num_classes):
-        start_norm = i / num_classes
-        end_norm = (i + 1) / num_classes
-        color = plotly_colors[i % len(plotly_colors)]
-        custom_colorscale.append([start_norm, color])
-        custom_colorscale.append([end_norm, color])
+    # # 決定境界用のカスタム定性的カラースケールを作成
+    # custom_colorscale = []
+    # num_classes = 10
+    # for i in range(num_classes):
+    #     start_norm = i / num_classes
+    #     end_norm = (i + 1) / num_classes
+    #     color = plotly_colors[i % len(plotly_colors)]
+    #     custom_colorscale.append([start_norm, color])
+    #     custom_colorscale.append([end_norm, color])
 
-    # 決定境界をHeatmapで描画
+    # # 決定境界をHeatmapで描画
+    # fig.add_trace(go.Heatmap(
+    #     x=np.arange(x_min, x_max, 0.1),
+    #     y=np.arange(y_min, y_max, 0.1),
+    #     z=Z,
+    #     colorscale=custom_colorscale,
+    #     # ===【修正部分】背景色を薄くする ===
+    #     opacity=0.35,          # 1.0 (鮮やか) から 0.35 (薄く) に変更
+    #     # ================================
+    #     showscale=False,      
+    #     hoverinfo='skip'      
+    # ))
+
+    # # クラスごとに散布図（Scatter）を描画
+    # for i in range(10):
+    #     idx = labels == i
+    #     fig.add_trace(go.Scatter(
+    #         x=features_2d[idx, 0],
+    #         y=features_2d[idx, 1],
+    #         mode='markers',
+    #         marker=dict(size=6, line=dict(width=0.5, color='black'), color=plotly_colors[i % len(plotly_colors)]),
+    #         name=f'Class {i}',
+    #         text=[f'Class {i}'] * sum(idx),
+    #         hoverinfo='text+x+y'
+    #     ))
+
+    # if annotated_features_2d is not None:
+    #     fig.add_trace(go.Scatter(
+    #         x=annotated_features_2d[:, 0],
+    #         y=annotated_features_2d[:, 1],
+    #         mode='markers',
+    #         marker=dict(
+    #             # ===【修正部分】星マークを小さく、枠を細くする ===
+    #             size=8,                   # 18 から 10 に縮小
+    #             symbol='star',             
+    #             color='rgba(0,0,0,0)',     
+    #             line=dict(width=2, color='red') # 太さ 3 から 2 に変更
+    #             # ============================================
+    #         ),
+    #         name=label_text,
+    #         text=[label_text] * len(annotated_features_2d),
+    #         hoverinfo='text+x+y'
+    #     ))
+
+    # fig.update_layout(
+    #     title=f'UMAP Feature Space & Decision Boundary<br>(Mode: {mode_str}, Cycle: {target_cycle})',
+    #     xaxis_title='UMAP Dimension 1',
+    #     yaxis_title='UMAP Dimension 2',
+    #     width=1000,
+    #     height=800,
+    #     legend_title='Digit Class',
+    #     template='plotly_white' 
+    # )
+    
+    # base_weight_name = os.path.splitext(os.path.basename(weight_path))[0]
+    # save_name = os.path.join(OUTPUT_DIR, f'decision_boundary_{base_weight_name}.html')
+    # fig.write_html(save_name)
+    # print(f"インタラクティブなグラフを '{save_name}' に保存しました")
+    
+    # 1. 背景のHeatmap（不確実性をヒートマップで描画）
     fig.add_trace(go.Heatmap(
         x=np.arange(x_min, x_max, 0.1),
         y=np.arange(y_min, y_max, 0.1),
-        z=Z,
-        colorscale=custom_colorscale,
-        # ===【修正部分】背景色を薄くする ===
-        opacity=0.35,          # 1.0 (鮮やか) から 0.35 (薄く) に変更
-        # ================================
-        showscale=False,      
+        z=Z_entropy,
+        colorscale='Reds',      # 白（不確実性低）→ 赤（不確実性高）のグラデーション
+        opacity=0.6,            # 透明度を少し下げて散布図を見やすくする
+        showscale=True,         # カラーバーを表示
+        colorbar=dict(title="Uncertainty<br>(Entropy)", x=1.1),
         hoverinfo='skip'      
     ))
 
-    # クラスごとに散布図（Scatter）を描画
+    # データ点の描画に使用する定性的カラーを取得
+    plotly_colors = px.colors.qualitative.Plotly 
+
+    # 2. クラスごとの散布図（どの場所にどのクラスが分布しているかを重ねる）
     for i in range(10):
         idx = labels == i
         fig.add_trace(go.Scatter(
@@ -159,18 +236,17 @@ def process_and_plot(weight_path, mode_str, target_cycle, test_loader, train_dat
             hoverinfo='text+x+y'
         ))
 
+    # 3. 新規アノテーションデータの強調表示
     if annotated_features_2d is not None:
         fig.add_trace(go.Scatter(
             x=annotated_features_2d[:, 0],
             y=annotated_features_2d[:, 1],
             mode='markers',
             marker=dict(
-                # ===【修正部分】星マークを小さく、枠を細くする ===
-                size=8,                   # 18 から 10 に縮小
+                size=10,                   
                 symbol='star',             
                 color='rgba(0,0,0,0)',     
-                line=dict(width=2, color='red') # 太さ 3 から 2 に変更
-                # ============================================
+                line=dict(width=2, color='white') # 背景が赤くなる可能性を考慮して白枠に変更
             ),
             name=label_text,
             text=[label_text] * len(annotated_features_2d),
@@ -178,17 +254,18 @@ def process_and_plot(weight_path, mode_str, target_cycle, test_loader, train_dat
         ))
 
     fig.update_layout(
-        title=f'UMAP Feature Space & Decision Boundary<br>(Mode: {mode_str}, Cycle: {target_cycle})',
+        title=f'UMAP Uncertainty (Entropy) Map<br>(Mode: {mode_str}, Cycle: {target_cycle})',
         xaxis_title='UMAP Dimension 1',
         yaxis_title='UMAP Dimension 2',
-        width=1000,
+        width=1100, 
         height=800,
         legend_title='Digit Class',
         template='plotly_white' 
     )
     
+    # 既存のファイル名を上書きしてしまうと分かりづらいため、名前に 'uncertainty_' を付けます
     base_weight_name = os.path.splitext(os.path.basename(weight_path))[0]
-    save_name = os.path.join(OUTPUT_DIR, f'decision_boundary_{base_weight_name}.html')
+    save_name = os.path.join(OUTPUT_DIR, f'uncertainty_map_{base_weight_name}.html')
     fig.write_html(save_name)
     print(f"インタラクティブなグラフを '{save_name}' に保存しました")
 
