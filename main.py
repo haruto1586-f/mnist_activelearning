@@ -43,6 +43,8 @@ def main():
         labeled_indices = initial_labeled_indices.copy()
         unlabeled_indices = initial_unlabeled_indices.copy()
         model = get_resnet50_for_mnist(device)
+        
+        save_model(model,0,0.0, mode_str) #初期モデルの保存
             
         all_evaluation_results = [] # 評価結果を保存するリスト
         all_annotated_records = [] # アノテーションしたデータの記録を保存するリスト

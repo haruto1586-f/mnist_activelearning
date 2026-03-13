@@ -6,6 +6,7 @@ import plotly.express as px
 import os
 import glob
 import sys
+import streamlit.components.v1 as components
 
 # Streamlitのページ設定
 st.set_page_config(page_title="MNIST Active Learning Dashboard", layout="wide")
@@ -13,7 +14,7 @@ st.title("MNIST Active Learning Dashboard 🚀")
 
 # 対象のoutputフォルダを見つける
 @st.cache_data
-def get_target_dir():
+def get_latest_dir():
     # Streamlitの引数(-- output_X)から取得
     for arg in sys.argv:
         if arg.startswith("output_"):
@@ -25,7 +26,7 @@ def get_target_dir():
         return None
     return max(dirs, key=lambda d: int(d.split('_')[-1]) if d.split('_')[-1].isdigit() else -1)
 
-latest_dir = get_target_dir()
+latest_dir = get_latest_dir()
 
 if not latest_dir:
     st.warning("実験結果 (output_X フォルダ) が見つかりません。先に main.py を実行してください。")
@@ -226,17 +227,26 @@ with tab2:
 # Tab 3: 決定境界 (UMAP)
 # ==========================================
 with tab3:
-    st.header(f"決定境界と特徴空間 (UMAP) - Cycle {selected_cycle}")
-    st.markdown("`visualize.py` で生成された HTML または PNG を表示します。")
-
-    html_file_umap = os.path.join(latest_dir, f"decision_boundary_model_weights_{selected_mode}_cycle{selected_cycle}.html")
-    png_file_umap = os.path.join(latest_dir, f"decision_boundary_model_weights_{selected_mode}_cycle{selected_cycle}.png")
-
-    if os.path.exists(html_file_umap):
-        with open(html_file_umap, 'r', encoding='utf-8') as f:
-            html_content_umap = f.read()
-        st.components.v1.html(html_content_umap, height=850, scrolling=True)
-    elif os.path.exists(png_file_umap):
-        st.image(png_file_umap, use_container_width=True)
-    else:
-        st.warning(f"Cycle {selected_cycle} の決定境界グラフが見つかりません。先に visualize.py を実行してください。")
+        st.header("3. UMAP 可視化 (学習前後 並列表示)")
+        
+        # 選択中のモードのログからCycleを取得
+        df_annotated_temp = pd.read_csv(os.path.join(latest_dir, f"annotated_data_log_{selected_mode}.csv"))
+        umap_cycles = df_annotated_temp['Cycle'].unique()
+        selected_umap_cycle = st.selectbox("Cycleを選択してください", sorted(umap_cycles), key='umap_cycle')
+        
+        # 新しいインタラクティブHTMLのパス (サイドバーの mode 変数を使用)
+        umap_html_path = os.path.join(latest_dir, f"umap_parallel_{selected_mode}_cycle{selected_umap_cycle}.html")
+        
+        if os.path.exists(umap_html_path):
+            # HTMLファイルを読み込んで表示
+            with open(umap_html_path, 'r', encoding='utf-8') as f:
+                html_data = f.read()
+            # 左右並列表示のため、高さを十分に確保してスクロール可能にする
+            components.html(html_data, height=800, scrolling=True)
+        else:
+            # まだ新しいプログラムを実行していない場合のフォールバック（従来の静的画像）
+            umap_png_path = os.path.join(latest_dir, f"umap_{selected_mode}_cycle{selected_umap_cycle}.png")
+            if os.path.exists(umap_png_path):
+                st.image(umap_png_path, use_container_width=True)
+            else:
+                st.warning("対象のCycleのUMAP可視化データが見つかりません。")
