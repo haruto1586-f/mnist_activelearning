@@ -20,7 +20,7 @@ def main():
     EPOCHS = 3
     
     #reset_model_each_cycle = True   # True:毎サイクル初期化, False:継続学習
-    sampling_strategy = 'manual'   # 'entropy' または 'manual'
+    sampling_strategy = 'entropy'   # 'entropy' または 'manual'
 
     # 1. データの準備
     train_dataset, test_dataset = get_mnist_datasets()

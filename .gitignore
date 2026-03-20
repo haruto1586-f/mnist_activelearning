@@ -219,3 +219,15 @@ datasets/
 *.csv
 results/
 outputs/
+
+# 画像ファイルを除外
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+
+# HTMLファイルを除外
+*.html
+*.htm
