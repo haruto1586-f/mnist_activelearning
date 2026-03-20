@@ -216,6 +216,10 @@ datasets/
 *.weights
 
 # 実験結果のログや出力画像（必要に応じて）
+*.csv
+results/
+output_*/
+
 # 画像ファイルを除外
 *.png
 *.jpg
@@ -223,6 +227,7 @@ datasets/
 *.gif
 *.bmp
 *.tiff
+
 # HTMLファイルを除外
 *.html
 *.htm
