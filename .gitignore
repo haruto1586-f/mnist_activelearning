@@ -219,6 +219,7 @@ datasets/
 *.csv
 results/
 output_*/
+cartography_output/
 
 # 画像ファイルを除外
 *.png
