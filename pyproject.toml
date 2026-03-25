@@ -1,0 +1,25 @@
+[project]
+name = "mnist-activelearning"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Your Name",email = "you@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "numpy (>=2.4.3,<3.0.0)",
+    "pandas (>=3.0.1,<4.0.0)",
+    "matplotlib (>=3.10.8,<4.0.0)",
+    "scikit-learn (>=1.8.0,<2.0.0)",
+    "umap-learn (>=0.5.11,<0.6.0)",
+    "plotly (>=6.6.0,<7.0.0)",
+    "torch (>=2.11.0,<3.0.0)",
+    "torchvision (>=0.26.0,<0.27.0)",
+    "wandb (>=0.25.1,<0.26.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
