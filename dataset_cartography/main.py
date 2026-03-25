@@ -31,7 +31,7 @@ def main():
     os.makedirs(output_dir, exist_ok=True)
     
     # 保存用ファイルのパス設定
-    checkpoint_path = os.path.join(output_dir, "checkpoint.pth")
+    checkpoint_path = os.path.join(output_dir, "checkpoint.pt")
     train_dyn_path = os.path.join(output_dir, "train_dynamics.npy")
     test_dyn_path = os.path.join(output_dir, "test_dynamics.npy")
 

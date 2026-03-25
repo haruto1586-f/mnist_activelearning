@@ -166,5 +166,5 @@ else:
         )
         fig_fp.update_traces(mode='lines+markers', marker=dict(size=6), opacity=0.7)
         fig_fp.update_layout(yaxis_range=[-0.05, 1.05], xaxis_range=[0.5, max_epochs + 0.5])
-        fig_fp.add.hline(y=0.5, line_dash="dash", line_color="gray", annotation_text="0.5 Threshold", annotation_position="top left")
+        fig_fp.add_hline(y=0.5, line_dash="dash", line_color="gray", annotation_text="0.5 Threshold", annotation_position="top left")
         st.plotly_chart(fig_fp, use_container_width=True)
