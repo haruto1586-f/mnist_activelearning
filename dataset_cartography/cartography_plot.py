@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.express as px
 import numpy as np
 import os
+from PIL import Image
 
 # ページ全体の設定 (横幅を広く使う)
 st.set_page_config(page_title="Cartography Dashboard", layout="wide")
@@ -113,7 +114,8 @@ else:
             title="Cartography Region",
             itemsizing='constant',
             font=dict(size=14)
-        )
+        ),
+        height=700
     )
     
     st.plotly_chart(fig_map, use_container_width=True)
@@ -127,8 +129,23 @@ else:
         'FP (Incorrect)'
     )
     
-    tp_indices = df_current[df_current['Prediction_Type'] == 'TP (Correct)']['Index'].sample(n=sample_size, random_state=42, replace=True).unique()
-    fp_indices = df_current[df_current['Prediction_Type'] == 'FP (Incorrect)']['Index'].sample(n=sample_size, random_state=42, replace=True).unique()
+    # tp_indices = df_current[df_current['Prediction_Type'] == 'TP (Correct)']['Index'].sample(n=sample_size, random_state=42, replace=True).unique()
+    # fp_indices = df_current[df_current['Prediction_Type'] == 'FP (Incorrect)']['Index'].sample(n=sample_size, random_state=42, replace=True).unique()
+    # 対象となる全インデックスを取得
+    all_tp = df_current[df_current['Prediction_Type'] == 'TP (Correct)']['Index'].unique()
+    all_fp = df_current[df_current['Prediction_Type'] == 'FP (Incorrect)']['Index'].unique()
+    
+    # スライダーの指定数と、実際のデータ数のうち「小さい方」を採用する
+    n_tp = min(len(all_tp), sample_size)
+    n_fp = min(len(all_fp), sample_size)
+    
+    # ランダムシードを固定して、重複なし(replace=False)で抽出
+    np.random.seed(42)
+    tp_indices = np.random.choice(all_tp, size=n_tp, replace=False) if n_tp > 0 else []
+    fp_indices = np.random.choice(all_fp, size=n_fp, replace=False) if n_fp > 0 else []
+
+    def prep_trend_df(indices):
+        return df_filtered[df_filtered['Index'].isin(indices)].copy()
     
     def prep_trend_df(indices):
         # 折れ線グラフは「指定エポックまでの推移」を見せる
@@ -168,3 +185,49 @@ else:
         fig_fp.update_layout(yaxis_range=[-0.05, 1.05], xaxis_range=[0.5, max_epochs + 0.5])
         fig_fp.add_hline(y=0.5, line_dash="dash", line_color="gray", annotation_text="0.5 Threshold", annotation_position="top left")
         st.plotly_chart(fig_fp, use_container_width=True)
+        
+    # ==========================================
+    # 6. 画像ビューアー (折れ線グラフで選ばれたインデックスから選択)
+    # ==========================================
+    st.markdown("---")
+    st.subheader("🔍 Image Viewer: Examine Specific Examples")
+
+    # TODO: 画像が保存されているディレクトリのパスを指定してください
+    # 例: "data/images" や "assets/images" など
+    IMAGE_DIR = "images" 
+
+    def load_and_display_image(index, label_type):
+        """指定されたインデックスの画像を読み込み、メタデータと共に表示する関数"""
+        # TODO: 拡張子は実際の画像データに合わせて変更してください（.png, .jpg, .jpeg 等）
+        image_path = os.path.join(IMAGE_DIR, f"{index}.jpg")
+        
+        if os.path.exists(image_path):
+            img = Image.open(image_path)
+            st.image(img, caption=f"Index: {index} ({label_type})", use_column_width=True)
+            
+            # そのインデックスの現在のエポックでの予測状況も併記すると親切です
+            row_data = df_current[df_current['Index'] == index].iloc[0]
+            st.write(f"**True Label:** `{row_data['True_Label']}`")
+            st.write(f"**Predicted Label:** `{row_data['Predicted_Label']}`")
+            st.write(f"**Confidence:** `{row_data['Prob']:.4f}`")
+        else:
+            st.warning(f"画像が見つかりません: `{image_path}`")
+
+    # TPとFPそれぞれに対応するプルダウンと画像表示領域を2カラムで作成
+    col_img1, col_img2 = st.columns(2)
+
+    with col_img1:
+        if len(tp_indices) > 0:
+            # TPのインデックスリストをソートしてプルダウンに渡す
+            selected_tp_index = st.selectbox("Select TP Index (from line chart):", sorted(tp_indices))
+            load_and_display_image(selected_tp_index, "TP")
+        else:
+            st.info("TPデータがありません。")
+
+    with col_img2:
+        if len(fp_indices) > 0:
+            # FPのインデックスリストをソートしてプルダウンに渡す
+            selected_fp_index = st.selectbox("Select FP Index (from line chart):", sorted(fp_indices))
+            load_and_display_image(selected_fp_index, "FP")
+        else:
+            st.info("FPデータがありません。")

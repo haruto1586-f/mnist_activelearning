@@ -232,3 +232,9 @@ cartography_output/
 # HTMLファイルを除外
 *.html
 *.htm
+
+# dataset_cartographyフォルダ内のすべてのファイルを除外
+dataset_cartography/*
+
+# ただし、dataset_cartographyフォルダ内の .py ファイルだけは除外を取り消す（許可する）
+!dataset_cartography/*.py
