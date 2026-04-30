@@ -1,4 +1,6 @@
 import os
+import argparse
+import sys
 import torch
 import numpy as np
 import pandas as pd
@@ -8,10 +10,32 @@ from sampling import entropy_sampling, manual_class_sampling
 from train import train_model, evaluate_model
 from logger import save_model, save_logs
 
+def _parse_args():
+    p = argparse.ArgumentParser()
+    p.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
+    p.add_argument("--num-workers", type=int, default=0)
+    return p.parse_args()
+
+def _resolve_device(device_arg: str) -> torch.device:
+    if device_arg == "cpu":
+        return torch.device("cpu")
+    if device_arg == "cuda":
+        if not torch.cuda.is_available():
+            raise RuntimeError("CUDA is not available. Install CUDA-enabled PyTorch and NVIDIA driver.")
+        return torch.device("cuda")
+    # auto
+    return torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 def main():
-    # デバイスの設定
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    args = _parse_args()
+    print(f"python: {sys.executable}")
+    print(f"torch: {torch.__version__}")
+    print(f"cuda available: {torch.cuda.is_available()}")
+
+    device = _resolve_device(args.device)
     print(f"Using device: {device}")
+    if device.type == "cuda":
+        print(f"GPU: {torch.cuda.get_device_name(0)} (count={torch.cuda.device_count()})")
 
     # --- 実験設定 ---
     NUM_CYCLES = 5
@@ -76,7 +100,13 @@ def main():
             if reset_model_each_cycle:
                 model = get_resnet50_for_mnist(device)
             
-            train_loader, test_loader = get_dataloaders(train_dataset, test_dataset, labeled_indices)
+            train_loader, test_loader = get_dataloaders(
+                train_dataset,
+                test_dataset,
+                labeled_indices,
+                num_workers=args.num_workers,
+                pin_memory=(device.type == "cuda"),
+            )
         
             # モデルの学習
             model, epoch_losses = train_model(model, train_loader, device, epochs=EPOCHS)
